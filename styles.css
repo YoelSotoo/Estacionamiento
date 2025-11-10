@@ -1,0 +1,52 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    text-align: center;
+    margin: 20px;
+    background-color: #eaf6fb;
+    color: #222;
+}
+
+h1 { color: #0b5ea8; }
+
+.parking-lot {
+    display: grid;
+    grid-template-columns: repeat(3, 140px);
+    gap: 18px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.parking-space {
+    width: 140px;
+    height: 160px;
+    border-radius: 8px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+.parking-space:hover { transform: translateY(-4px); box-shadow: 0 8px 18px rgba(0,0,0,0.12); }
+
+.available { background: linear-gradient(180deg,#45b25a,#369c4b); }
+.occupied  { background: linear-gradient(180deg,#ef6b68,#e3453f); cursor: default; }
+.selected  { background: linear-gradient(180deg,#3aa0f2,#1f78c9); }
+
+.space-number { font-size: 28px; font-weight: 700; text-align: left; }
+.time-info { font-size: 14px; text-align: right; }
+
+.legend { margin-top: 18px; display:flex; justify-content:center; gap:18px; }
+.legend-item { display:flex; gap:8px; align-items:center; }
+.legend-color { width:18px; height:14px; border-radius:3px; }
+
+#status-messages { margin-top:18px; color:#114b69; }
+
+.modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:90; }
+.payment-modal { display:none; position:fixed; z-index:100; left:50%; top:50%; transform:translate(-50%,-50%); background:#fff; padding:18px; border-radius:8px; width:320px; box-shadow:0 10px 30px rgba(0,0,0,.2); }
+.payment-modal h2 { margin:0 0 10px 0; font-size:18px; }
+.pay-button { display:inline-block; margin-top:12px; padding:10px 16px; background:#28a745; color:#fff; border-radius:6px; cursor:pointer; border:none; }
+
+.small { font-size:13px; color:#444; }
