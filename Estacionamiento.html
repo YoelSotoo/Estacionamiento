@@ -182,45 +182,49 @@
 
         modalCancel.addEventListener('click', closeModal);
 
-        modalConfirm.addEventListener('click', () => {
-            const mode = paymentModal.dataset.mode;
-            const id = Number(paymentModal.dataset.space);
-            if (!id) return closeModal();
+       modalConfirm.addEventListener('click', () => {
+    const mode = paymentModal.dataset.mode;
+    const id = Number(paymentModal.dataset.space);
+    if (!id) return closeModal();
 
-            if (mode === 'reserve') {
-                // Simular pago de depósito y crear reserva (no iniciar el conteo hasta que se escanee)
-                reserveSpace(id);
-                closeModal();
-            } else if (mode === 'exit') {
-                // --- AÑADE ESTAS LÍNEAS AQUÍ, ANTES DE CALCULAR MONTOS ---
-                // (ESP32 call removed) - liberar espacio localmente
-                // --- FIN DE LÍNEAS NUEVAS ---
+    if (mode === 'reserve') {
+        // Simular pago de depósito y crear reserva (no iniciar el conteo hasta que se escanee)
+        reserveSpace(id);
+        closeModal();
+    } else if (mode === 'exit') {
+        // 🔥 NUEVO: Enviar comando al escáner para abrir SALIDA
+        const exitCommand = { 
+            action: 'openExit', 
+            spaceId: id 
+        };
+        localStorage.setItem('parkingCommand', JSON.stringify(exitCommand));
+        // 🔥 FIN NUEVO
 
-                const now = Date.now();
-                const elapsed = now - spaces[id].start;
-                const minutes = Math.ceil(elapsed / 60000);
-                const amount = calculateAmountFromMinutes(minutes);
+        const now = Date.now();
+        const elapsed = now - spaces[id].start;
+        const minutes = Math.ceil(elapsed / 60000);
+        const amount = calculateAmountFromMinutes(minutes);
 
-                // Generar QR de recibo con información del pago
-                const qrData = `Pago: Espacio ${id} | Fecha: ${new Date().toLocaleString()} | Duración: ${formatElapsed(elapsed)} | Minutos: ${minutes} | Monto: $${amount}`;
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
-                const qrContainer = document.getElementById('qrContainer');
-                const qrImage = document.getElementById('qrImage');
-                qrImage.src = qrUrl;
-                document.getElementById('qrTitle').textContent = `Recibo - Espacio ${id}`;
-                qrContainer.style.display = 'block';
+        // Generar QR de recibo con información del pago
+        const qrData = `Pago: Espacio ${id} | Fecha: ${new Date().toLocaleString()} | Duración: ${formatElapsed(elapsed)} | Minutos: ${minutes} | Monto: $${amount}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+        const qrContainer = document.getElementById('qrContainer');
+        const qrImage = document.getElementById('qrImage');
+        qrImage.src = qrUrl;
+        document.getElementById('qrTitle').textContent = `Recibo - Espacio ${id}`;
+        qrContainer.style.display = 'block';
 
-                // Simular pago del tiempo (no se descuenta el depósito)
-                if (spaces[id].timerId) clearInterval(spaces[id].timerId);
-                spaces[id] = { occupied:false, start:null, timerId:null, depositPaid:0 };
-                const el = document.querySelector(`[data-space="${id}"]`);
-                el.classList.remove('occupied','selected');
-                el.classList.add('available');
-                el.querySelector('.time-info').innerHTML = '--:--<br>$0';
-                closeModal();
-                statusMessages.textContent = `Pago de $${amount} realizado. Espacio ${id} liberado.`;
-            }
-        });
+        // Simular pago del tiempo (no se descuenta el depósito)
+        if (spaces[id].timerId) clearInterval(spaces[id].timerId);
+        spaces[id] = { occupied:false, start:null, timerId:null, depositPaid:0 };
+        const el = document.querySelector(`[data-space="${id}"]`);
+        el.classList.remove('occupied','selected');
+        el.classList.add('available');
+        el.querySelector('.time-info').innerHTML = '--:--<br>$0';
+        closeModal();
+        statusMessages.textContent = `Pago de $${amount} realizado. Espacio ${id} liberado. Abriendo salida...`;
+    }
+});
 
         // Crear reserva: paga depósito y genera QR, pero NO inicia el conteo
         function reserveSpace(id) {
@@ -232,7 +236,7 @@
 
             // Generar y mostrar QR para la reserva
             const qrData = `Reserva: Espacio ${id} | Fecha: ${new Date().toLocaleString()} | Depósito: $${RESERVE_FEE}`;
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+            const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qrData)}&size=200&margin=1`;
             const qrContainer = document.getElementById('qrContainer');
             const qrImage = document.getElementById('qrImage');
             qrImage.src = qrUrl;
