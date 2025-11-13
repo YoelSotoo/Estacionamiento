@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Estacionamiento</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+        }
+        
+        .container {
+            text-align: center;
+        }
+        
+        .btn-abrir {
+            padding: 20px 40px;
+            font-size: 24px;
+            background: #fff;
+            color: #333;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-abrir:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            background: #f8f9fa;
+        }
+        
+        h1 {
+            color: white;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 Sistema de Estacionamiento</h1>
+        <button class="btn-abrir" onclick="abrirEstacionamiento()">
+            ABRIR SISTEMA
+        </button>
+    </div>
+
+    <script>
+        function abrirEstacionamiento() {
+            // Cambia "Estacionamiento.html" por el nombre real de tu archivo
+            window.location.href = 'Estacionamiento.html';
+            
+            // O si es una carpeta:
+            // window.location.href = 'Estacionamiento/';
+            
+            // O si quieres abrir en nueva pestaña:
+            // window.open('Estacionamiento.html', '_blank');
+        }
+    </script>
+</body>
+</html>
