@@ -28,10 +28,27 @@
 		}
 		.toast.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
 	</style>
+	
+	<!-- 🔥 FIREBASE -->
+	<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+	<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+	<script>
+		const firebaseConfig = {
+			apiKey: "AIzaSyAB2CmEQVHfRM7ioVFJVMsSXH6Sour-_Gc",
+			authDomain: "estacionamiento-yoel.firebaseapp.com",
+			databaseURL: "https://estacionamiento-yoel-default-rtdb.firebaseio.com",
+			projectId: "estacionamiento-yoel",
+			storageBucket: "estacionamiento-yoel.firebasestorage.app",
+			messagingSenderId: "90413387632",
+			appId: "1:90413387632:web:95cc5c5e46f84f48c549b5"
+		};
+		firebase.initializeApp(firebaseConfig);
+		const database = firebase.database();
+	</script>
 </head>
 <body>
 	<h1>Escanear código QR</h1>
-	<p class="small">Apunta la cámara al QR de la reserva. Al detectar el QR, el escáner guardará el comando en el almacenamiento local (localStorage) y mostrará confirmación. No se abrirá ninguna pestaña automáticamente.</p>
+	<p class="small">Apunta la cámara al QR de la reserva. Al detectar el QR, el escáner guardará el comando en Firebase y mostrará confirmación.</p>
 
 	<video id="video" autoplay muted playsinline></video>
 	<canvas id="canvas" hidden></canvas>
@@ -112,7 +129,7 @@
         return n ? Number(n[1]) : null;
     }
 
-    // 🔥 NUEVA FUNCIÓN: Procesar comandos del estacionamiento
+    // 🔥 FUNCIÓN: Procesar comandos del estacionamiento
     function processCommandObject(cmd) {
         try {
             if (!cmd) return;
@@ -133,7 +150,7 @@
                 }
             }
             
-            // 🔥 NUEVO COMANDO: Abrir SALIDA cuando pagan en la web
+            // 🔥 COMANDO: Abrir SALIDA cuando pagan en la web
             else if (cmd.action === 'openExit' && Number.isInteger(cmd.spaceId)) {
                 if (serialPort && writer) {
                     status.textContent = `Abriendo SALIDA para espacio ${cmd.spaceId}...`;
@@ -145,6 +162,9 @@
                         showToast('Portón de SALIDA cerrado.');
                         status.textContent = 'Cámara activa. Escaneando...';
                     }, 5000);
+                    
+                    // 🔥 LIMPIAR comando de Firebase después de procesarlo
+                    database.ref('commands/exit').remove();
                 }
             }
             
@@ -165,13 +185,17 @@
             return;
         }
 
-        // Enviar comando al estacionamiento
+        // 🔥 NUEVO: Enviar comando al estacionamiento VIA FIREBASE
         try {
-            const cmd = { action: 'start', spaceId: Number(spaceId) };
-            localStorage.setItem('parkingCommand', JSON.stringify(cmd));
-            showToast(`Comando enviado: iniciar espacio ${spaceId}`);
+            const cmd = { action: 'start', spaceId: Number(spaceId), timestamp: Date.now() };
+            database.ref('commands/entrada').set(cmd).then(() => {
+                showToast(`Comando enviado: iniciar espacio ${spaceId}`);
+            }).catch(error => {
+                console.error('Error enviando a Firebase:', error);
+                showToast('Error enviando comando');
+            });
         } catch (e) {
-            console.error('No se pudo escribir parkingCommand en localStorage', e);
+            console.error('No se pudo escribir en Firebase', e);
         }
 
         // Si hay ESP32 conectado, abrir ENTRADA
@@ -183,19 +207,28 @@
         }
     }
 
-    // 🔥 NUEVA FUNCIÓN: Revisar comandos de salida
-    function checkForExitCommands() {
-        try {
-            const raw = localStorage.getItem('parkingCommand');
-            if (raw) {
-                const cmd = JSON.parse(raw);
-                processCommandObject(cmd);
-                // Limpiar comando después de procesarlo
-                localStorage.removeItem('parkingCommand');
+    // 🔥 ESCUCHAR COMANDOS DE FIREBASE (SALIDA)
+    function setupFirebaseListener() {
+        // Escuchar comandos de salida
+        database.ref('commands/exit').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data && data.action === 'openExit') {
+                console.log('Comando de salida recibido:', data);
+                processCommandObject(data);
             }
-        } catch (e) {
-            console.error('Error procesando parkingCommand:', e);
-        }
+        });
+        
+        // Escuchar comandos de entrada (backup)
+        database.ref('commands/entrada').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data && data.action === 'start') {
+                console.log('Comando de entrada recibido:', data);
+                // También procesar entrada por si acaso
+                if (!scanLock && serialPort && writer) {
+                    processCommandObject(data);
+                }
+            }
+        });
     }
 
     // --- Bucle para escuchar al ESP32 ---
@@ -305,20 +338,11 @@
     openApp.addEventListener('click', () => window.open('Estacionamiento.html', '_blank'));
     connectBtn.addEventListener('click', conectarConESP32);
 
-    // 🔥 INICIAR revisión de comandos cada segundo
-    setInterval(checkForExitCommands, 1000);
+    // 🔥 INICIAR ESCUCHA DE FIREBASE
+    setupFirebaseListener();
 
-    // 🔥 Escuchar eventos de storage en tiempo real
-    window.addEventListener('storage', (ev) => {
-        if (ev.key === 'parkingCommand' && ev.newValue) {
-            const cmd = JSON.parse(ev.newValue);
-            processCommandObject(cmd);
-            try { localStorage.removeItem('parkingCommand'); } catch(_){}
-        }
-    });
-
-    // 🔥 NO auto-iniciar cámara - el usuario debe hacer clic
-    // startCamera(); // COMENTADO - Ahora el usuario debe hacer clic en "Iniciar cámara"
+    // NO auto-iniciar cámara - el usuario debe hacer clic
+    // startCamera(); // COMENTADO
 </script>
 </body>
 </html>

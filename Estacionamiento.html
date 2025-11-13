@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estacionamiento - Demo</title>
     <link rel="stylesheet" href="styles.css">
+    
+    <!-- 🔥 FIREBASE -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAB2CmEQVHfRM7ioVFJVMsSXH6Sour-_Gc",
+            authDomain: "estacionamiento-yoel.firebaseapp.com",
+            databaseURL: "https://estacionamiento-yoel-default-rtdb.firebaseio.com",
+            projectId: "estacionamiento-yoel",
+            storageBucket: "estacionamiento-yoel.firebasestorage.app",
+            messagingSenderId: "90413387632",
+            appId: "1:90413387632:web:95cc5c5e46f84f48c549b5"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+    </script>
 </head>
 <body>
     <h1>Estacionamiento (demo)</h1>
@@ -48,7 +65,36 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-    // No se usa WS relay ni ESP32 en esta versión local
+        // 🔥 ESCUCHAR FIREBASE PARA COMANDOS DE ENTRADA
+        function setupFirebaseListener() {
+            database.ref('commands/entrada').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.action === 'start') {
+                    console.log('Comando de entrada recibido desde escáner:', data);
+                    
+                    const id = Number(data.spaceId);
+                    if (!spaces[id]) {
+                        statusMessages.textContent = `Comando para espacio inválido: ${id}`;
+                        return;
+                    }
+                    if (spaces[id].occupied) {
+                        statusMessages.textContent = `El espacio ${id} ya está ocupado.`;
+                        return;
+                    }
+                    
+                    // Iniciar ocupación
+                    startOccupy(id);
+                    statusMessages.textContent = `Escaneado: Espacio ${id} ocupado y tiempo iniciado.`;
+                    
+                    // Limpiar comando
+                    database.ref('commands/entrada').remove();
+                }
+            });
+        }
+        
+        // Iniciar el listener
+        setupFirebaseListener();
+
         // Configuración de tarifas 
         const RATE_PER_MINUTE = 5; // $ por minuto
 
@@ -164,6 +210,7 @@
                 <p class="small">Tiempo transcurrido: ${formatElapsed(elapsed)} (${minutes} min)</p>
                 <p class="small">Monto a pagar por tiempo: <strong>$${amount}</strong></p>
                 <p class="small">Depósito ya pagado: <strong>$${spaces[id].depositPaid || 0}</strong></p>
+                <p class="small" style="color:#007bff; font-weight:bold;">⚠️ Se abrirá el portón de SALIDA automáticamente</p>
             `;
             modalConfirm.textContent = `Pagar $${amount} y liberar`;
             paymentModal.dataset.mode = 'exit';
@@ -182,49 +229,52 @@
 
         modalCancel.addEventListener('click', closeModal);
 
-       modalConfirm.addEventListener('click', () => {
-    const mode = paymentModal.dataset.mode;
-    const id = Number(paymentModal.dataset.space);
-    if (!id) return closeModal();
+        modalConfirm.addEventListener('click', () => {
+            const mode = paymentModal.dataset.mode;
+            const id = Number(paymentModal.dataset.space);
+            if (!id) return closeModal();
 
-    if (mode === 'reserve') {
-        // Simular pago de depósito y crear reserva (no iniciar el conteo hasta que se escanee)
-        reserveSpace(id);
-        closeModal();
-    } else if (mode === 'exit') {
-        // 🔥 NUEVO: Enviar comando al escáner para abrir SALIDA
-        const exitCommand = { 
-            action: 'openExit', 
-            spaceId: id 
-        };
-        localStorage.setItem('parkingCommand', JSON.stringify(exitCommand));
-        // 🔥 FIN NUEVO
+            if (mode === 'reserve') {
+                // Simular pago de depósito y crear reserva (no iniciar el conteo hasta que se escanee)
+                reserveSpace(id);
+                closeModal();
+            } else if (mode === 'exit') {
+                // 🔥 NUEVO: Enviar comando a Firebase para abrir SALIDA
+                database.ref('commands/exit').set({
+                    spaceId: id,
+                    timestamp: Date.now(),
+                    action: 'openExit'
+                }).then(() => {
+                    console.log('Comando de salida enviado a Firebase');
+                }).catch(error => {
+                    console.error('Error enviando a Firebase:', error);
+                });
 
-        const now = Date.now();
-        const elapsed = now - spaces[id].start;
-        const minutes = Math.ceil(elapsed / 60000);
-        const amount = calculateAmountFromMinutes(minutes);
+                const now = Date.now();
+                const elapsed = now - spaces[id].start;
+                const minutes = Math.ceil(elapsed / 60000);
+                const amount = calculateAmountFromMinutes(minutes);
 
-        // Generar QR de recibo con información del pago
-        const qrData = `Pago: Espacio ${id} | Fecha: ${new Date().toLocaleString()} | Duración: ${formatElapsed(elapsed)} | Minutos: ${minutes} | Monto: $${amount}`;
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
-        const qrContainer = document.getElementById('qrContainer');
-        const qrImage = document.getElementById('qrImage');
-        qrImage.src = qrUrl;
-        document.getElementById('qrTitle').textContent = `Recibo - Espacio ${id}`;
-        qrContainer.style.display = 'block';
+                // Generar QR de recibo con información del pago
+                const qrData = `Pago: Espacio ${id} | Fecha: ${new Date().toLocaleString()} | Duración: ${formatElapsed(elapsed)} | Minutos: ${minutes} | Monto: $${amount}`;
+                const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qrData)}&size=200&margin=1`;
+                const qrContainer = document.getElementById('qrContainer');
+                const qrImage = document.getElementById('qrImage');
+                qrImage.src = qrUrl;
+                document.getElementById('qrTitle').textContent = `Recibo - Espacio ${id}`;
+                qrContainer.style.display = 'block';
 
-        // Simular pago del tiempo (no se descuenta el depósito)
-        if (spaces[id].timerId) clearInterval(spaces[id].timerId);
-        spaces[id] = { occupied:false, start:null, timerId:null, depositPaid:0 };
-        const el = document.querySelector(`[data-space="${id}"]`);
-        el.classList.remove('occupied','selected');
-        el.classList.add('available');
-        el.querySelector('.time-info').innerHTML = '--:--<br>$0';
-        closeModal();
-        statusMessages.textContent = `Pago de $${amount} realizado. Espacio ${id} liberado. Abriendo salida...`;
-    }
-});
+                // Simular pago del tiempo (no se descuenta el depósito)
+                if (spaces[id].timerId) clearInterval(spaces[id].timerId);
+                spaces[id] = { occupied:false, start:null, timerId:null, depositPaid:0 };
+                const el = document.querySelector(`[data-space="${id}"]`);
+                el.classList.remove('occupied','selected');
+                el.classList.add('available');
+                el.querySelector('.time-info').innerHTML = '--:--<br>$0';
+                closeModal();
+                statusMessages.textContent = `Pago de $${amount} realizado. Espacio ${id} liberado. Abriendo salida...`;
+            }
+        });
 
         // Crear reserva: paga depósito y genera QR, pero NO inicia el conteo
         function reserveSpace(id) {
@@ -249,10 +299,6 @@
 
         // Iniciar ocupación (comenzar el contador) — normalmente se llama tras escanear el QR al entrar
         function startOccupy(id) {
-            // --- AÑADE ESTAS LÍNEAS AL INICIO DE LA FUNCIÓN ---
-            // (ESP32 call removed) - iniciar ocupación localmente
-            // --- FIN DE LÍNEAS NUEVAS ---
-
             const el = document.querySelector(`[data-space="${id}"]`);
             el.classList.remove('selected');
             el.classList.add('occupied');
@@ -371,7 +417,6 @@
                 window.open('camera_scan.html', '_blank');
             });
         }
-        // Scanner-related code removed. This page now runs standalone.
     });
     </script>
 </body>
