@@ -8,23 +8,50 @@ body {
     box-sizing: border-box;
 }
 
-h1 { color: #0b5ea8; margin-top: 0; }
+h1 {
+    color: #0b5ea8;
+    margin-top: 0;
+}
 
 .parking-lot {
     display: grid;
-    /* Responsive grid: fits as many 140px columns as possible, centering them */
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 18px;
+    /* Force 3 columns as requested: 1-2-3 top, 4-5-6 bottom */
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
     justify-content: center;
     margin-top: 20px;
-    max-width: 800px; /* Limit max width on large screens */
+    max-width: 600px;
+    /* Limit width to keep them grouped */
     margin-left: auto;
     margin-right: auto;
+    padding: 0 10px;
+}
+
+/* Adjust for smaller screens to keep the 3-column layout without breaking */
+@media (max-width: 480px) {
+    .parking-lot {
+        gap: 10px;
+    }
+
+    .parking-space {
+        height: 120px;
+        /* Slightly shorter on mobile */
+        padding: 8px;
+    }
+
+    .space-number {
+        font-size: 20px;
+    }
+
+    .time-info {
+        font-size: 11px;
+    }
 }
 
 .parking-space {
     /* width: 140px;  Removed fixed width */
-    width: 100%;      /* Take full width of the grid cell */
+    width: 100%;
+    /* Take full width of the grid cell */
     height: 160px;
     border-radius: 8px;
     color: #fff;
@@ -32,60 +59,113 @@ h1 { color: #0b5ea8; margin-top: 0; }
     flex-direction: column;
     justify-content: space-between;
     padding: 10px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
     cursor: pointer;
     transition: transform .12s ease, box-shadow .12s ease;
-    box-sizing: border-box; /* Ensure padding doesn't overflow */
+    box-sizing: border-box;
+    /* Ensure padding doesn't overflow */
 }
-.parking-space:hover { transform: translateY(-4px); box-shadow: 0 8px 18px rgba(0,0,0,0.12); }
 
-.available { background: linear-gradient(180deg,#45b25a,#369c4b); }
-.occupied  { background: linear-gradient(180deg,#ef6b68,#e3453f); cursor: default; }
-.selected  { background: linear-gradient(180deg,#3aa0f2,#1f78c9); }
-
-.space-number { font-size: 28px; font-weight: 700; text-align: left; }
-.time-info { font-size: 14px; text-align: right; }
-
-.legend { 
-    margin-top: 25px; 
-    display:flex; 
-    justify-content:center; 
-    gap:18px; 
-    flex-wrap: wrap; /* Allow wrapping on small screens */
+.parking-space:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
 }
-.legend-item { display:flex; gap:8px; align-items:center; }
-.legend-color { width:18px; height:14px; border-radius:3px; }
 
-#status-messages { margin-top:18px; color:#114b69; padding: 0 10px; }
+.available {
+    background: linear-gradient(180deg, #45b25a, #369c4b);
+}
 
-.modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:90; }
-.payment-modal { 
-    display:none; 
-    position:fixed; 
-    z-index:100; 
-    left:50%; 
-    top:50%; 
-    transform:translate(-50%,-50%); 
-    background:#fff; 
-    padding:20px; 
-    border-radius:12px; 
-    width: 90%;       /* Responsive width */
-    max-width: 350px; /* Max width for larger screens */
-    box-shadow:0 10px 30px rgba(0,0,0,.25); 
+.occupied {
+    background: linear-gradient(180deg, #ef6b68, #e3453f);
+    cursor: default;
+}
+
+.selected {
+    background: linear-gradient(180deg, #3aa0f2, #1f78c9);
+}
+
+.space-number {
+    font-size: 28px;
+    font-weight: 700;
+    text-align: left;
+}
+
+.time-info {
+    font-size: 14px;
+    text-align: right;
+}
+
+.legend {
+    margin-top: 25px;
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    /* Allow wrapping on small screens */
+}
+
+.legend-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.legend-color {
+    width: 18px;
+    height: 14px;
+    border-radius: 3px;
+}
+
+#status-messages {
+    margin-top: 18px;
+    color: #114b69;
+    padding: 0 10px;
+}
+
+.modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    z-index: 90;
+}
+
+.payment-modal {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    width: 90%;
+    /* Responsive width */
+    max-width: 350px;
+    /* Max width for larger screens */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
     box-sizing: border-box;
 }
-.payment-modal h2 { margin:0 0 15px 0; font-size:20px; color: #333; }
-.pay-button { 
-    display:inline-block; 
-    margin-top:15px; 
-    padding:12px 20px; 
-    background:#28a745; 
-    color:#fff; 
-    border-radius:8px; 
-    cursor:pointer; 
-    border:none; 
+
+.payment-modal h2 {
+    margin: 0 0 15px 0;
+    font-size: 20px;
+    color: #333;
+}
+
+.pay-button {
+    display: inline-block;
+    margin-top: 15px;
+    padding: 12px 20px;
+    background: #28a745;
+    color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    border: none;
     font-size: 16px;
-    width: 100%; /* Full width buttons on mobile are easier to tap */
+    width: 100%;
+    /* Full width buttons on mobile are easier to tap */
 }
 
 /* Button container in modal */
@@ -93,18 +173,26 @@ h1 { color: #0b5ea8; margin-top: 0; }
     flex-direction: column;
     gap: 10px;
 }
+
 /* Override inline style for buttons container if needed via specificity or !important, 
    but better to handle in HTML. For now, let's try to make the buttons stack if we can't change HTML easily here.
    Actually, the HTML has inline styles that might conflict. 
    Let's just make the buttons full width.
 */
 
-.small { font-size:14px; color:#555; line-height: 1.4; }
+.small {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.4;
+}
 
 /* Media query for very small screens */
 @media (max-width: 360px) {
     .parking-lot {
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     }
-    .space-number { font-size: 24px; }
+
+    .space-number {
+        font-size: 24px;
+    }
 }
