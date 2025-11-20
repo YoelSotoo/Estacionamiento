@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estacionamiento - Demo</title>
     <link rel="stylesheet" href="styles.css">
-    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
     <!-- 🔥 FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
@@ -23,6 +26,7 @@
         const database = firebase.database();
     </script>
 </head>
+
 <body>
     <h1>Estacionamiento (demo)</h1>
 
@@ -31,12 +35,22 @@
     </div>
 
     <div class="legend">
-        <div class="legend-item"><div class="legend-color" style="background:#45b25a"></div><div class="small">Disponible</div></div>
-        <div class="legend-item"><div class="legend-color" style="background:#ef6b68"></div><div class="small">Ocupado</div></div>
-        <div class="legend-item"><div class="legend-color" style="background:#3aa0f2"></div><div class="small">Seleccionado</div></div>
+        <div class="legend-item">
+            <div class="legend-color" style="background:#10b981"></div>
+            <div class="small">Disponible</div>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background:#ef4444"></div>
+            <div class="small">Ocupado</div>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background:#3b82f6"></div>
+            <div class="small">Seleccionado</div>
+        </div>
     </div>
 
-    <div id="status-messages">Haz clic en un espacio disponible para ocuparlo. Haz clic en el mismo espacio para pagar y liberarlo.</div>
+    <div id="status-messages">Haz clic en un espacio disponible para ocuparlo. Haz clic en el mismo espacio para pagar y
+        liberarlo.</div>
 
     <!-- Contenedor para mostrar QR y opciones de descarga -->
     <div id="qrContainer" style="margin-top:18px; display:none; text-align:center;">
@@ -61,356 +75,414 @@
     </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // 🔥 ESCUCHAR FIREBASE PARA COMANDOS DE ENTRADA
-        function setupFirebaseListener() {
-            database.ref('commands/entrada').on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (data && data.action === 'start') {
-                    console.log('Comando de entrada recibido desde escáner:', data);
-                    
-                    const id = Number(data.spaceId);
-                    if (!spaces[id]) {
-                        statusMessages.textContent = `Comando para espacio inválido: ${id}`;
-                        return;
+        document.addEventListener('DOMContentLoaded', () => {
+            // 🔥 ESCUCHAR FIREBASE PARA COMANDOS DE ENTRADA
+            function setupFirebaseListener() {
+                database.ref('commands/entrada').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data && data.action === 'start') {
+                        console.log('Comando de entrada recibido desde escáner:', data);
+
+                        const id = Number(data.spaceId);
+                        if (!spaces[id]) {
+                            statusMessages.textContent = `Comando para espacio inválido: ${id}`;
+                            return;
+                        }
+                        if (spaces[id].occupied) {
+                            statusMessages.textContent = `El espacio ${id} ya está ocupado.`;
+                            return;
+                        }
+
+                        // Iniciar ocupación
+                        startOccupy(id);
+                        statusMessages.textContent = `Iniciado por lector: Espacio ${id} ocupado y tiempo en curso.`;
+
+                        // Limpiar comando
+                        database.ref('commands/entrada').remove();
                     }
-                    if (spaces[id].occupied) {
-                        statusMessages.textContent = `El espacio ${id} ya está ocupado.`;
-                        return;
+                });
+            }
+
+            // Iniciar el listener
+            setupFirebaseListener();
+
+            // Configuración de tarifas 
+            const RATE_PER_MINUTE = 5; // $ por minuto
+
+            // Estado de los espacios
+            const spaces = {};
+            const TOTAL_SPACES = 6;
+
+            // Crear interfaz
+            const parkingLot = document.getElementById('parkingLot');
+            for (let i = 1; i <= TOTAL_SPACES; i++) {
+                const div = document.createElement('div');
+                div.className = 'parking-space available';
+                div.dataset.space = String(i);
+                // Estructura actualizada con icono
+                div.innerHTML = `
+                <div class="space-header">
+                    <span class="space-number">${i}</span>
+                    <span class="status-dot"></span>
+                </div>
+                <div class="space-icon">🅿️</div>
+                <div class="time-info">
+                    <span class="time">--:--</span>
+                    <span class="cost">$0</span>
+                </div>
+            `;
+                parkingLot.appendChild(div);
+
+                spaces[i] = { occupied: false, start: null, timerId: null, prepaidUntil: null, reserved: false, depositPaid: 0, lastQr: null };
+            }
+
+            const statusMessages = document.getElementById('status-messages');
+            const backdrop = document.getElementById('backdrop');
+            const paymentModal = document.getElementById('paymentModal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalSpace = document.getElementById('modal-space');
+            const modalBody = document.getElementById('modal-body');
+            const modalConfirm = document.getElementById('modalConfirm');
+            const modalCancel = document.getElementById('modalCancel');
+
+            // Utilidades
+            function formatElapsed(ms) {
+                const totalSeconds = Math.floor(ms / 1000);
+                const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+                const secs = (totalSeconds % 60).toString().padStart(2, '0');
+                return `${mins}:${secs}`;
+            }
+
+            function calculateAmountFromMinutes(minutes) {
+                // Cobro por minuto exacto
+                return Math.max(0, Math.ceil(minutes)) * RATE_PER_MINUTE;
+            }
+
+            function calculateAmountFromMs(ms) {
+                const minutes = Math.ceil(ms / 60000);
+                return calculateAmountFromMinutes(minutes);
+            }
+
+            function updateSpaceDisplay(i) {
+                const el = document.querySelector(`[data-space="${i}"]`);
+                const timeSpan = el.querySelector('.time');
+                const costSpan = el.querySelector('.cost');
+                const iconDiv = el.querySelector('.space-icon');
+
+                if (!spaces[i].occupied) {
+                    timeSpan.textContent = '--:--';
+                    costSpan.textContent = '$0';
+                    iconDiv.textContent = '🅿️';
+                    el.classList.remove('occupied-pulse');
+                    el.classList.remove('occupied');
+                    el.classList.add('available');
+                } else {
+                    const now = Date.now();
+                    const elapsed = now - spaces[i].start;
+                    let timeText = `${formatElapsed(elapsed)}`;
+                    let costText = '';
+
+                    if (spaces[i].prepaidUntil) {
+                        const remaining = spaces[i].prepaidUntil - now;
+                        costText = `$${calculateAmountFromMs(Math.max(0, now - spaces[i].start))}`;
+                    } else {
+                        costText = `$${calculateAmountFromMs(elapsed)}`;
                     }
-                    
-                    // Iniciar ocupación
-                    startOccupy(id);
-                    statusMessages.textContent = `Iniciado por lector: Espacio ${id} ocupado y tiempo en curso.`;
-                    
-                    // Limpiar comando
-                    database.ref('commands/entrada').remove();
+
+                    timeSpan.textContent = timeText;
+                    costSpan.textContent = costText;
+                    iconDiv.textContent = '🚗';
+
+                    el.classList.remove('available');
+                    el.classList.add('occupied');
+
+                    // Add pulse effect if not already there
+                    if (!el.classList.contains('occupied-pulse')) {
+                        el.classList.add('occupied-pulse');
+                    }
+                }
+            }
+
+            // manejar click en espacios
+            parkingLot.addEventListener('click', (ev) => {
+                const spaceEl = ev.target.closest('.parking-space');
+                if (!spaceEl) return;
+                const id = Number(spaceEl.dataset.space);
+
+                if (!spaces[id].occupied) {
+                    openReserveModal(id);
+                } else if (spaceEl.classList.contains('selected')) {
+                    openExitModal(id);
+                } else {
+                    clearSelections();
+                    spaceEl.classList.add('selected');
+                    statusMessages.textContent = `Espacio ${id} seleccionado para pago.`;
                 }
             });
-        }
-        
-        // Iniciar el listener
-        setupFirebaseListener();
 
-        // Configuración de tarifas 
-        const RATE_PER_MINUTE = 5; // $ por minuto
-
-        // Estado de los espacios
-        const spaces = {};
-        const TOTAL_SPACES = 6;
-
-        // Crear interfaz
-        const parkingLot = document.getElementById('parkingLot');
-        for (let i = 1; i <= TOTAL_SPACES; i++) {
-            const div = document.createElement('div');
-            div.className = 'parking-space available';
-            div.dataset.space = String(i);
-            div.innerHTML = `<div class="space-number">${i}</div><div class="time-info">--:--<br>$0</div>`;
-            parkingLot.appendChild(div);
-
-            spaces[i] = { occupied: false, start: null, timerId: null, prepaidUntil: null, reserved: false, depositPaid: 0, lastQr: null };
-        }
-
-        const statusMessages = document.getElementById('status-messages');
-        const backdrop = document.getElementById('backdrop');
-        const paymentModal = document.getElementById('paymentModal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalSpace = document.getElementById('modal-space');
-        const modalBody = document.getElementById('modal-body');
-        const modalConfirm = document.getElementById('modalConfirm');
-        const modalCancel = document.getElementById('modalCancel');
-
-        // Utilidades
-        function formatElapsed(ms) {
-            const totalSeconds = Math.floor(ms / 1000);
-            const mins = Math.floor(totalSeconds / 60).toString().padStart(2,'0');
-            const secs = (totalSeconds % 60).toString().padStart(2,'0');
-            return `${mins}:${secs}`;
-        }
-
-        function calculateAmountFromMinutes(minutes) {
-            // Cobro por minuto exacto
-            return Math.max(0, Math.ceil(minutes)) * RATE_PER_MINUTE;
-        }
-
-        function calculateAmountFromMs(ms) {
-            const minutes = Math.ceil(ms / 60000);
-            return calculateAmountFromMinutes(minutes);
-        }
-
-        function updateSpaceDisplay(i) {
-            const el = document.querySelector(`[data-space="${i}"]`);
-            const info = el.querySelector('.time-info');
-            if (!spaces[i].occupied) {
-                info.innerHTML = '--:--<br>$0';
-            } else {
-                const now = Date.now();
-                const elapsed = now - spaces[i].start;
-                let line = `${formatElapsed(elapsed)}`;
-                if (spaces[i].prepaidUntil) {
-                    const remaining = spaces[i].prepaidUntil - now;
-                    line += `<br>Prepagado restante: ${remaining>0?formatElapsed(remaining):'00:00'}`;
-                    line += `<br>$${calculateAmountFromMs(Math.max(0, now - spaces[i].start))}`;
-                } else {
-                    line += `<br>$${calculateAmountFromMs(elapsed)}`;
-                }
-                info.innerHTML = line;
+            function clearSelections() {
+                document.querySelectorAll('.parking-space.selected').forEach(s => s.classList.remove('selected'));
             }
-        }
 
-        // manejar click en espacios
-        parkingLot.addEventListener('click', (ev) => {
-            const spaceEl = ev.target.closest('.parking-space');
-            if (!spaceEl) return;
-            const id = Number(spaceEl.dataset.space);
-
-            if (!spaces[id].occupied) {
-                openReserveModal(id);
-            } else if (spaceEl.classList.contains('selected')) {
-                openExitModal(id);
-            } else {
-                clearSelections();
-                spaceEl.classList.add('selected');
-                statusMessages.textContent = `Espacio ${id} seleccionado para pago.`;
+            // Modal para reservar pagando $20 ahora (depósito)
+            const RESERVE_FEE = 20;
+            function openReserveModal(id) {
+                modalTitle.textContent = `Reservar espacio ${id}`;
+                modalSpace.textContent = id;
+                modalBody.innerHTML = `
+                <div style="text-align:center; margin-bottom:15px;">
+                    <div style="font-size:40px;">🅿️</div>
+                    <p style="color:#666;">Estás a punto de reservar el espacio <strong>${id}</strong>.</p>
+                </div>
+                <div style="background:#f3f4f6; padding:15px; border-radius:8px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span>Depósito inicial:</span>
+                        <strong>$${RESERVE_FEE}</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Tarifa por minuto:</span>
+                        <strong>$${RATE_PER_MINUTE}</strong>
+                    </div>
+                </div>
+            `;
+                modalConfirm.textContent = `Pagar $${RESERVE_FEE} y reservar`;
+                paymentModal.dataset.mode = 'reserve';
+                paymentModal.dataset.space = id;
+                backdrop.style.display = 'block';
+                paymentModal.style.display = 'block';
             }
-        });
 
-        function clearSelections() {
-            document.querySelectorAll('.parking-space.selected').forEach(s => s.classList.remove('selected'));
-        }
-
-        // Modal para reservar pagando $20 ahora (depósito)
-        const RESERVE_FEE = 20;
-        function openReserveModal(id) {
-            modalTitle.textContent = `Reservar espacio `;
-            modalSpace.textContent = id;
-            modalBody.innerHTML = `
-                <p class="small">Para apartar este lugar debes pagar <strong>$${RESERVE_FEE}</strong> ahora.</p>
-                <p class="small">Después, por cada minuto se agregarán <strong>$${RATE_PER_MINUTE}</strong>.</p>
-            `;
-            modalConfirm.textContent = `Pagar $${RESERVE_FEE} y reservar`;
-            paymentModal.dataset.mode = 'reserve';
-            paymentModal.dataset.space = id;
-            backdrop.style.display = 'block';
-            paymentModal.style.display = 'block';
-        }
-
-        // Modal exit: calcular tiempo y costo a pagar (solo tiempo)
-        function openExitModal(id) {
-            modalTitle.textContent = `Pagar al salir - espacio `;
-            modalSpace.textContent = id;
-            const now = Date.now();
-            const elapsed = now - spaces[id].start;
-            const minutes = Math.ceil(elapsed / 60000);
-            const amount = calculateAmountFromMinutes(minutes);
-            modalBody.innerHTML = `
-                <p class="small">Tiempo transcurrido: ${formatElapsed(elapsed)} (${minutes} min)</p>
-                <p class="small">Monto a pagar por tiempo: <strong>$${amount}</strong></p>
-                <p class="small">Depósito ya pagado: <strong>$${spaces[id].depositPaid || 0}</strong></p>
-                <p class="small" style="color:#007bff; font-weight:bold;">⚠️ Se abrirá el portón de SALIDA automáticamente</p>
-            `;
-            modalConfirm.textContent = `Pagar $${amount} y liberar`;
-            paymentModal.dataset.mode = 'exit';
-            paymentModal.dataset.space = id;
-            backdrop.style.display = 'block';
-            paymentModal.style.display = 'block';
-        }
-
-        function closeModal() {
-            backdrop.style.display = 'none';
-            paymentModal.style.display = 'none';
-            delete paymentModal.dataset.space;
-            delete paymentModal.dataset.mode;
-            modalBody.innerHTML = '';
-        }
-
-        modalCancel.addEventListener('click', closeModal);
-
-        modalConfirm.addEventListener('click', () => {
-            const mode = paymentModal.dataset.mode;
-            const id = Number(paymentModal.dataset.space);
-            if (!id) return closeModal();
-
-            if (mode === 'reserve') {
-                // Simular pago de depósito y crear reserva (no iniciar el conteo hasta que se escanee)
-                reserveSpace(id);
-                closeModal();
-            } else if (mode === 'exit') {
-                // 🔥 NUEVO: Enviar comando a Firebase para abrir SALIDA
-                database.ref('commands/exit').set({
-                    spaceId: id,
-                    timestamp: Date.now(),
-                    action: 'openExit'
-                }).then(() => {
-                    console.log('Comando de salida enviado a Firebase');
-                }).catch(error => {
-                    console.error('Error enviando a Firebase:', error);
-                });
-
+            // Modal exit: calcular tiempo y costo a pagar (solo tiempo)
+            function openExitModal(id) {
+                modalTitle.textContent = `Checkout - Espacio ${id}`;
+                modalSpace.textContent = id;
                 const now = Date.now();
                 const elapsed = now - spaces[id].start;
                 const minutes = Math.ceil(elapsed / 60000);
                 const amount = calculateAmountFromMinutes(minutes);
+                modalBody.innerHTML = `
+                <div style="text-align:center; margin-bottom:15px;">
+                    <div style="font-size:40px;">🚗</div>
+                    <p style="color:#666;">Confirmar salida del vehículo.</p>
+                </div>
+                <div style="background:#f3f4f6; padding:15px; border-radius:8px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span>Tiempo total:</span>
+                        <strong>${formatElapsed(elapsed)} (${minutes} min)</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:#22c55e; font-weight:bold; font-size:1.1em;">
+                        <span>Total a pagar:</span>
+                        <span>$${amount}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.9em; color:#666;">
+                        <span>Depósito pagado:</span>
+                        <span>$${spaces[id].depositPaid || 0}</span>
+                    </div>
+                </div>
+                <p class="small" style="color:#3b82f6; font-weight:bold; text-align:center; margin-top:10px;">
+                    ⚠️ Se abrirá el portón de SALIDA automáticamente
+                </p>
+            `;
+                modalConfirm.textContent = `Pagar $${amount} y liberar`;
+                paymentModal.dataset.mode = 'exit';
+                paymentModal.dataset.space = id;
+                backdrop.style.display = 'block';
+                paymentModal.style.display = 'block';
+            }
 
-                // Generar QR de recibo con información del pago
-                const qrData = `Pago: Espacio ${id} | Fecha: ${new Date().toLocaleString()} | Duración: ${formatElapsed(elapsed)} | Minutos: ${minutes} | Monto: $${amount}`;
+            function closeModal() {
+                backdrop.style.display = 'none';
+                paymentModal.style.display = 'none';
+                delete paymentModal.dataset.space;
+                delete paymentModal.dataset.mode;
+                modalBody.innerHTML = '';
+            }
+
+            modalCancel.addEventListener('click', closeModal);
+
+            modalConfirm.addEventListener('click', () => {
+                const mode = paymentModal.dataset.mode;
+                const id = Number(paymentModal.dataset.space);
+                if (!id) return closeModal();
+
+                if (mode === 'reserve') {
+                    // Simular pago de depósito y crear reserva (no iniciar el conteo hasta que se escanee)
+                    reserveSpace(id);
+                    closeModal();
+                } else if (mode === 'exit') {
+                    // 🔥 NUEVO: Enviar comando a Firebase para abrir SALIDA
+                    database.ref('commands/exit').set({
+                        spaceId: id,
+                        timestamp: Date.now(),
+                        action: 'openExit'
+                    }).then(() => {
+                        console.log('Comando de salida enviado a Firebase');
+                    }).catch(error => {
+                        console.error('Error enviando a Firebase:', error);
+                    });
+
+                    const now = Date.now();
+                    const elapsed = now - spaces[id].start;
+                    const minutes = Math.ceil(elapsed / 60000);
+                    const amount = calculateAmountFromMinutes(minutes);
+
+                    // Generar QR de recibo con información del pago
+                    const qrData = `Pago: Espacio ${id} | Fecha: ${new Date().toLocaleString()} | Duración: ${formatElapsed(elapsed)} | Minutos: ${minutes} | Monto: $${amount}`;
+                    const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qrData)}&size=200&margin=1`;
+                    const qrContainer = document.getElementById('qrContainer');
+                    const qrImage = document.getElementById('qrImage');
+                    qrImage.src = qrUrl;
+                    document.getElementById('qrTitle').textContent = `Recibo - Espacio ${id}`;
+                    qrContainer.style.display = 'block';
+
+                    // Simular pago del tiempo (no se descuenta el depósito)
+                    if (spaces[id].timerId) clearInterval(spaces[id].timerId);
+                    spaces[id] = { occupied: false, start: null, timerId: null, depositPaid: 0 };
+
+                    // Reset UI
+                    updateSpaceDisplay(id);
+                    const el = document.querySelector(`[data-space="${id}"]`);
+                    el.classList.remove('selected');
+
+                    closeModal();
+                    statusMessages.textContent = `Pago de $${amount} realizado. Espacio ${id} liberado. Abriendo salida...`;
+                }
+            });
+
+            // Crear reserva: paga depósito y genera QR, pero NO inicia el conteo
+            function reserveSpace(id) {
+                const el = document.querySelector(`[data-space="${id}"]`);
+                el.classList.remove('available');
+                el.classList.add('selected');
+                spaces[id].reserved = true;
+                spaces[id].depositPaid = RESERVE_FEE;
+
+                // Generar y mostrar QR para la reserva
+                const qrData = `Reserva: Espacio ${id} | Fecha: ${new Date().toLocaleString()} | Depósito: $${RESERVE_FEE}`;
                 const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qrData)}&size=200&margin=1`;
                 const qrContainer = document.getElementById('qrContainer');
                 const qrImage = document.getElementById('qrImage');
                 qrImage.src = qrUrl;
-                document.getElementById('qrTitle').textContent = `Recibo - Espacio ${id}`;
+                document.getElementById('qrTitle').textContent = `Reserva - Espacio ${id}`;
                 qrContainer.style.display = 'block';
+                // guardar info en el objeto espacio para descargar si se necesita
+                spaces[id].lastQr = { data: qrData, url: qrUrl };
+                statusMessages.textContent = `Espacio ${id} reservado ($${RESERVE_FEE} pagado). Escanea al entrar para iniciar el tiempo.`;
+            }
 
-                // Simular pago del tiempo (no se descuenta el depósito)
-                if (spaces[id].timerId) clearInterval(spaces[id].timerId);
-                spaces[id] = { occupied:false, start:null, timerId:null, depositPaid:0 };
+            // Iniciar ocupación (comenzar el contador) — normalmente se llama tras escanear el QR al entrar
+            function startOccupy(id) {
                 const el = document.querySelector(`[data-space="${id}"]`);
-                el.classList.remove('occupied','selected');
-                el.classList.add('available');
-                el.querySelector('.time-info').innerHTML = '--:--<br>$0';
-                closeModal();
-                statusMessages.textContent = `Pago de $${amount} realizado. Espacio ${id} liberado. Abriendo salida...`;
+                el.classList.remove('selected');
+                el.classList.add('occupied');
+                spaces[id].occupied = true;
+                spaces[id].start = Date.now();
+                spaces[id].reserved = false;
+
+                // iniciar timer por espacio
+                if (spaces[id].timerId) clearInterval(spaces[id].timerId);
+                spaces[id].timerId = setInterval(() => updateSpaceDisplay(id), 1000);
+                updateSpaceDisplay(id);
+                statusMessages.textContent = `Espacio ${id} ocupado. Tiempo en curso...`;
             }
-        });
 
-        // Crear reserva: paga depósito y genera QR, pero NO inicia el conteo
-        function reserveSpace(id) {
-            const el = document.querySelector(`[data-space="${id}"]`);
-            el.classList.remove('available');
-            el.classList.add('selected');
-            spaces[id].reserved = true;
-            spaces[id].depositPaid = RESERVE_FEE;
+            backdrop.addEventListener('click', closeModal);
 
-            // Generar y mostrar QR para la reserva
-            const qrData = `Reserva: Espacio ${id} | Fecha: ${new Date().toLocaleString()} | Depósito: $${RESERVE_FEE}`;
-            const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qrData)}&size=200&margin=1`;
-            const qrContainer = document.getElementById('qrContainer');
-            const qrImage = document.getElementById('qrImage');
-            qrImage.src = qrUrl;
-            document.getElementById('qrTitle').textContent = `Reserva - Espacio ${id}`;
-            qrContainer.style.display = 'block';
-            // guardar info en el objeto espacio para descargar si se necesita
-            spaces[id].lastQr = { data: qrData, url: qrUrl };
-            statusMessages.textContent = `Espacio ${id} reservado ($${RESERVE_FEE} pagado). Escanea al entrar para iniciar el tiempo.`;
-        }
+            // Inicializar visual (todos disponibles)
+            for (let i = 1; i <= TOTAL_SPACES; i++) updateSpaceDisplay(i);
 
-        // Iniciar ocupación (comenzar el contador) — normalmente se llama tras escanear el QR al entrar
-        function startOccupy(id) {
-            const el = document.querySelector(`[data-space="${id}"]`);
-            el.classList.remove('selected');
-            el.classList.add('occupied');
-            spaces[id].occupied = true;
-            spaces[id].start = Date.now();
-            spaces[id].reserved = false;
-
-            // iniciar timer por espacio
-            if (spaces[id].timerId) clearInterval(spaces[id].timerId);
-            spaces[id].timerId = setInterval(() => updateSpaceDisplay(id), 1000);
-            updateSpaceDisplay(id);
-            statusMessages.textContent = `Espacio ${id} ocupado. Tiempo en curso...`;
-        }
-
-        backdrop.addEventListener('click', closeModal);
-
-        // Inicializar visual (todos disponibles)
-        for (let i = 1; i <= TOTAL_SPACES; i++) updateSpaceDisplay(i);
-
-        // Procesar comandos escritos por el escáner (camera_scan.html) mediante localStorage
-        // Esto funciona cuando ambas páginas están en el MISMO ORIGEN (misma IP+puerto) y preferiblemente
-        // en el mismo navegador/host. Para sincronización entre dispositivos necesitas un relay (WebSocket).
-        function processCommandObject(cmd) {
-            try {
-                if (!cmd) return;
-                if (cmd.action === 'start' && Number.isInteger(cmd.spaceId)) {
-                    const id = Number(cmd.spaceId);
-                    if (!spaces[id]) {
-                        statusMessages.textContent = `Comando recibido para espacio inválido: ${id}`;
-                        return;
+            // Procesar comandos escritos por el escáner (camera_scan.html) mediante localStorage
+            function processCommandObject(cmd) {
+                try {
+                    if (!cmd) return;
+                    if (cmd.action === 'start' && Number.isInteger(cmd.spaceId)) {
+                        const id = Number(cmd.spaceId);
+                        if (!spaces[id]) {
+                            statusMessages.textContent = `Comando recibido para espacio inválido: ${id}`;
+                            return;
+                        }
+                        if (spaces[id].occupied) {
+                            statusMessages.textContent = `El espacio ${id} ya está ocupado.`;
+                            return;
+                        }
+                        // Iniciar ocupación localmente
+                        startOccupy(id);
+                        statusMessages.textContent = `Iniciado por lector: Espacio ${id} ocupado y tiempo en curso.`;
                     }
-                    if (spaces[id].occupied) {
-                        statusMessages.textContent = `El espacio ${id} ya está ocupado.`;
-                        return;
-                    }
-                    // Iniciar ocupación localmente
-                    startOccupy(id);
-                    statusMessages.textContent = `Iniciado por lector: Espacio ${id} ocupado y tiempo en curso.`;
-                }
-            } catch (err) { console.error('processCommandObject error', err); }
-        }
-
-        // Al cargar, revisar si ya hay un comando en localStorage (por si el scanner lo dejó antes)
-        try {
-            const raw = localStorage.getItem('parkingCommand');
-            if (raw) {
-                const cmd = JSON.parse(raw);
-                processCommandObject(cmd);
-                // limpiar comando para evitar re-procesos
-                localStorage.removeItem('parkingCommand');
+                } catch (err) { console.error('processCommandObject error', err); }
             }
-        } catch (e) { console.error('Error procesando parkingCommand on load', e); }
 
-        // Escuchar storage events para recibir comandos desde otra pestaña del mismo origen
-        window.addEventListener('storage', (ev) => {
+            // Al cargar, revisar si ya hay un comando en localStorage (por si el scanner lo dejó antes)
             try {
-                if (ev.key === 'parkingCommand' && ev.newValue) {
-                    const cmd = JSON.parse(ev.newValue);
+                const raw = localStorage.getItem('parkingCommand');
+                if (raw) {
+                    const cmd = JSON.parse(raw);
                     processCommandObject(cmd);
-                    // limpiar (quien escribió puede limpiar también); aquí lo limpiamos para evitar duplicados
-                    try { localStorage.removeItem('parkingCommand'); } catch(_){}
+                    // limpiar comando para evitar re-procesos
+                    localStorage.removeItem('parkingCommand');
                 }
-            } catch (err) { console.error('storage event processing error', err); }
-        });
+            } catch (e) { console.error('Error procesando parkingCommand on load', e); }
 
-        // Descargar PNG del QR
-        document.getElementById('downloadPng').addEventListener('click', () => {
-            const img = document.getElementById('qrImage');
-            const link = document.createElement('a');
-            link.href = img.src;
-            link.download = 'reserva-qr.png';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
+            // Escuchar storage events para recibir comandos desde otra pestaña del mismo origen
+            window.addEventListener('storage', (ev) => {
+                try {
+                    if (ev.key === 'parkingCommand' && ev.newValue) {
+                        const cmd = JSON.parse(ev.newValue);
+                        processCommandObject(cmd);
+                        // limpiar (quien escribió puede limpiar también); aquí lo limpiamos para evitar duplicados
+                        try { localStorage.removeItem('parkingCommand'); } catch (_) { }
+                    }
+                } catch (err) { console.error('storage event processing error', err); }
+            });
 
-        // Descargar PDF: crear contenido con DOM en la nueva ventana para evitar document.write issues
-        document.getElementById('downloadPdf').addEventListener('click', () => {
-            const img = document.getElementById('qrImage');
-            try {
-                const w = window.open('', '_blank');
-                if (!w) {
-                    alert('La ventana para imprimir fue bloqueada. Habilita ventanas emergentes para este sitio.');
-                    return;
+            // Descargar PNG del QR
+            document.getElementById('downloadPng').addEventListener('click', () => {
+                const img = document.getElementById('qrImage');
+                const link = document.createElement('a');
+                link.href = img.src;
+                link.download = 'reserva-qr.png';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            // Descargar PDF: crear contenido con DOM en la nueva ventana para evitar document.write issues
+            document.getElementById('downloadPdf').addEventListener('click', () => {
+                const img = document.getElementById('qrImage');
+                try {
+                    const w = window.open('', '_blank');
+                    if (!w) {
+                        alert('La ventana para imprimir fue bloqueada. Habilita ventanas emergentes para este sitio.');
+                        return;
+                    }
+                    const doc = w.document;
+                    doc.title = 'Reserva QR';
+                    // limpiar body
+                    doc.body.innerHTML = '';
+                    doc.body.style.margin = '0';
+                    doc.body.style.display = 'flex';
+                    doc.body.style.alignItems = 'center';
+                    doc.body.style.justifyContent = 'center';
+                    const container = doc.createElement('div');
+                    container.style.textAlign = 'center';
+                    const h = doc.createElement('h2');
+                    h.textContent = document.getElementById('qrTitle').textContent;
+                    const im = doc.createElement('img');
+                    im.src = img.src;
+                    im.style.width = '300px';
+                    im.style.height = '300px';
+                    container.appendChild(h);
+                    container.appendChild(im);
+                    doc.body.appendChild(container);
+                    w.focus();
+                    setTimeout(() => { w.print(); }, 500);
+                } catch (e) {
+                    console.error(e);
+                    alert('No se pudo abrir la vista para imprimir.');
                 }
-                const doc = w.document;
-                doc.title = 'Reserva QR';
-                // limpiar body
-                doc.body.innerHTML = '';
-                doc.body.style.margin = '0';
-                doc.body.style.display = 'flex';
-                doc.body.style.alignItems = 'center';
-                doc.body.style.justifyContent = 'center';
-                const container = doc.createElement('div');
-                container.style.textAlign = 'center';
-                const h = doc.createElement('h2');
-                h.textContent = document.getElementById('qrTitle').textContent;
-                const im = doc.createElement('img');
-                im.src = img.src;
-                im.style.width = '300px';
-                im.style.height = '300px';
-                container.appendChild(h);
-                container.appendChild(im);
-                doc.body.appendChild(container);
-                w.focus();
-                setTimeout(() => { w.print(); }, 500);
-            } catch (e) {
-                console.error(e);
-                alert('No se pudo abrir la vista para imprimir.');
-            }
+            });
         });
-
-        // 🔥 ELIMINADO: Botón para abrir el escáner
-        // El código del botón "Abrir escáner" ha sido removido
-    });
     </script>
 </body>
+
 </html>

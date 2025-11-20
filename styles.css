@@ -1,26 +1,30 @@
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
     text-align: center;
     margin: 0;
     padding: 20px;
-    background-color: #eaf6fb;
-    color: #222;
+    background: linear-gradient(135deg, #f6f8fd 0%, #eef2f9 100%);
+    color: #1e293b;
     box-sizing: border-box;
+    min-height: 100vh;
 }
 
 h1 {
-    color: #0b5ea8;
-    margin-top: 0;
+    color: #0f172a;
+    margin-top: 10px;
+    margin-bottom: 30px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
 }
 
 .parking-lot {
     display: grid;
     /* Force 3 columns as requested: 1-2-3 top, 4-5-6 bottom */
     grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
+    gap: 24px;
     justify-content: center;
     margin-top: 20px;
-    max-width: 600px;
+    max-width: 700px;
     /* Limit width to keep them grouped */
     margin-left: auto;
     margin-right: auto;
@@ -30,104 +34,203 @@ h1 {
 /* Adjust for smaller screens to keep the 3-column layout without breaking */
 @media (max-width: 480px) {
     .parking-lot {
-        gap: 10px;
+        gap: 12px;
     }
 
     .parking-space {
-        height: 120px;
-        /* Slightly shorter on mobile */
-        padding: 8px;
+        height: 130px !important;
+        padding: 12px !important;
     }
 
     .space-number {
-        font-size: 20px;
+        font-size: 20px !important;
     }
 
-    .time-info {
-        font-size: 11px;
+    .space-icon {
+        font-size: 32px !important;
+    }
+
+    .time {
+        font-size: 12px !important;
+    }
+
+    .cost {
+        font-size: 12px !important;
     }
 }
 
 .parking-space {
-    /* width: 140px;  Removed fixed width */
     width: 100%;
-    /* Take full width of the grid cell */
-    height: 160px;
-    border-radius: 8px;
-    color: #fff;
+    height: 180px;
+    border-radius: 16px;
+    background: #fff;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    padding: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     cursor: pointer;
-    transition: transform .12s ease, box-shadow .12s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-sizing: border-box;
-    /* Ensure padding doesn't overflow */
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
 }
 
 .parking-space:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
+/* Status Styles */
 .available {
-    background: linear-gradient(180deg, #45b25a, #369c4b);
+    border-color: #e2e8f0;
+}
+
+.available:hover {
+    border-color: #10b981;
+}
+
+.available .status-dot {
+    background-color: #10b981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
 }
 
 .occupied {
-    background: linear-gradient(180deg, #ef6b68, #e3453f);
-    cursor: default;
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.occupied .status-dot {
+    background-color: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+}
+
+.occupied .space-number {
+    color: #991b1b;
+}
+
+.occupied .space-icon {
+    transform: scale(1.1);
 }
 
 .selected {
-    background: linear-gradient(180deg, #3aa0f2, #1f78c9);
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+
+.selected .status-dot {
+    background-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+/* Pulse Animation for Occupied */
+@keyframes pulse-red {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+.occupied-pulse {
+    animation: pulse-red 2s infinite;
+}
+
+/* Inner Elements */
+.space-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .space-number {
-    font-size: 28px;
-    font-weight: 700;
-    text-align: left;
+    font-size: 24px;
+    font-weight: 800;
+    color: #64748b;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.space-icon {
+    font-size: 48px;
+    margin: auto;
+    transition: transform 0.3s ease;
 }
 
 .time-info {
-    font-size: 14px;
     text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
+.time {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.cost {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+/* Legend */
 .legend {
-    margin-top: 25px;
+    margin-top: 40px;
     display: flex;
     justify-content: center;
-    gap: 18px;
+    gap: 24px;
     flex-wrap: wrap;
-    /* Allow wrapping on small screens */
 }
 
 .legend-item {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
+    background: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .legend-color {
-    width: 18px;
-    height: 14px;
-    border-radius: 3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
 }
 
 #status-messages {
-    margin-top: 18px;
-    color: #114b69;
-    padding: 0 10px;
+    margin-top: 30px;
+    color: #475569;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    display: inline-block;
+    backdrop-filter: blur(4px);
 }
 
+/* Modal */
 .modal-backdrop {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, .45);
+    background: rgba(15, 23, 42, 0.6);
     z-index: 90;
+    backdrop-filter: blur(4px);
 }
 
 .payment-modal {
@@ -138,61 +241,51 @@ h1 {
     top: 50%;
     transform: translate(-50%, -50%);
     background: #fff;
-    padding: 20px;
-    border-radius: 12px;
+    padding: 24px;
+    border-radius: 24px;
     width: 90%;
-    /* Responsive width */
-    max-width: 350px;
-    /* Max width for larger screens */
-    box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+    max-width: 400px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
     box-sizing: border-box;
 }
 
 .payment-modal h2 {
-    margin: 0 0 15px 0;
-    font-size: 20px;
-    color: #333;
+    margin: 0 0 20px 0;
+    font-size: 22px;
+    color: #0f172a;
+    font-weight: 700;
 }
 
 .pay-button {
     display: inline-block;
-    margin-top: 15px;
-    padding: 12px 20px;
-    background: #28a745;
+    margin-top: 10px;
+    padding: 14px 24px;
+    background: #10b981;
     color: #fff;
-    border-radius: 8px;
+    border-radius: 12px;
     cursor: pointer;
     border: none;
     font-size: 16px;
+    font-weight: 600;
     width: 100%;
-    /* Full width buttons on mobile are easier to tap */
+    transition: transform 0.2s, background 0.2s;
 }
 
-/* Button container in modal */
+.pay-button:active {
+    transform: scale(0.98);
+}
+
+.pay-button:hover {
+    background: #059669;
+}
+
 .payment-modal div[style*="justify-content:flex-end"] {
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
 }
-
-/* Override inline style for buttons container if needed via specificity or !important, 
-   but better to handle in HTML. For now, let's try to make the buttons stack if we can't change HTML easily here.
-   Actually, the HTML has inline styles that might conflict. 
-   Let's just make the buttons full width.
-*/
 
 .small {
     font-size: 14px;
-    color: #555;
-    line-height: 1.4;
-}
-
-/* Media query for very small screens */
-@media (max-width: 360px) {
-    .parking-lot {
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    }
-
-    .space-number {
-        font-size: 24px;
-    }
+    color: #64748b;
+    line-height: 1.5;
 }
