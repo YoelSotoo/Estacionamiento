@@ -1,348 +1,384 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width,initial-scale=1">
-	<title>Escáner QR - Estacionamiento</title>
-	<style>
-		body{font-family:Segoe UI, Tahoma, Arial; text-align:center; margin:18px; background:#eef9ff}
-		video{width:320px; height:240px; border-radius:8px; background:#000}
-		#output{margin-top:12px}
-		button{padding:8px 12px; margin:6px; border-radius:6px; border:none; background:#0b7; color:#fff; cursor:pointer}
-		.small{font-size:13px; color:#333}
-		/* Toast notification */
-		.toast {
-			position: fixed;
-			left: 50%;
-			transform: translateX(-50%);
-			bottom: 24px;
-			background: rgba(34,34,34,0.95);
-			color: #fff;
-			padding: 10px 16px;
-			border-radius: 8px;
-			box-shadow: 0 6px 18px rgba(0,0,0,0.25);
-			font-size: 14px;
-			z-index: 9999;
-			opacity: 0;
-			transition: opacity .25s ease, transform .25s ease;
-		}
-		.toast.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
-	</style>
-	
-	<!-- 🔥 FIREBASE -->
-	<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-	<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
-	<script>
-		const firebaseConfig = {
-			apiKey: "AIzaSyAB2CmEQVHfRM7ioVFJVMsSXH6Sour-_Gc",
-			authDomain: "estacionamiento-yoel.firebaseapp.com",
-			databaseURL: "https://estacionamiento-yoel-default-rtdb.firebaseio.com",
-			projectId: "estacionamiento-yoel",
-			storageBucket: "estacionamiento-yoel.firebasestorage.app",
-			messagingSenderId: "90413387632",
-			appId: "1:90413387632:web:95cc5c5e46f84f48c549b5"
-		};
-		firebase.initializeApp(firebaseConfig);
-		const database = firebase.database();
-	</script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Escáner QR - Estacionamiento</title>
+    <style>
+        body {
+            font-family: Segoe UI, Tahoma, Arial;
+            text-align: center;
+            margin: 18px;
+            background: #eef9ff
+        }
+
+        video {
+            width: 320px;
+            height: 240px;
+            border-radius: 8px;
+            background: #000
+        }
+
+        #output {
+            margin-top: 12px
+        }
+
+        button {
+            padding: 8px 12px;
+            margin: 6px;
+            border-radius: 6px;
+            border: none;
+            background: #0b7;
+            color: #fff;
+            cursor: pointer
+        }
+
+        .small {
+            font-size: 13px;
+            color: #333
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 24px;
+            background: rgba(34, 34, 34, 0.95);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+            font-size: 14px;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity .25s ease, transform .25s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-6px);
+        }
+    </style>
+
+    <!-- 🔥 FIREBASE -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAB2CmEQVHfRM7ioVFJVMsSXH6Sour-_Gc",
+            authDomain: "estacionamiento-yoel.firebaseapp.com",
+            databaseURL: "https://estacionamiento-yoel-default-rtdb.firebaseio.com",
+            projectId: "estacionamiento-yoel",
+            storageBucket: "estacionamiento-yoel.firebasestorage.app",
+            messagingSenderId: "90413387632",
+            appId: "1:90413387632:web:95cc5c5e46f84f48c549b5"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+    </script>
 </head>
+
 <body>
-	<h1>Escanear código QR</h1>
-	<p class="small">Apunta la cámara al QR de la reserva. Al detectar el QR, el escáner guardará el comando en Firebase y mostrará confirmación.</p>
+    <h1>Escanear código QR</h1>
+    <p class="small">Apunta la cámara al QR de la reserva. Al detectar el QR, el escáner guardará el comando en Firebase
+        y mostrará confirmación.</p>
 
-	<video id="video" autoplay muted playsinline></video>
-	<canvas id="canvas" hidden></canvas>
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="canvas" hidden></canvas>
 
-	<div id="output">Estado: <span id="status">Haz clic en "Iniciar cámara"</span></div>
+    <div id="output">Estado: <span id="status">Haz clic en "Iniciar cámara"</span></div>
 
-	<div style="margin-top:8px">
-		<button id="startBtn">Iniciar cámara</button>
-		<button id="stopBtn">Detener</button>
-		<button id="openApp">Abrir estacionamiento</button>
-		<button id="connectBtn" style="background:#f39c12;">Conectar ESP32</button>
-	</div>
+    <div style="margin-top:8px">
+        <button id="startBtn">Iniciar cámara</button>
+        <button id="stopBtn">Detener</button>
+        <button id="openApp">Abrir estacionamiento</button>
+        <button id="connectBtn" style="background:#f39c12;">Conectar ESP32</button>
+    </div>
 
-<script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
-<script>
-    // --- Elementos del DOM (HTML) ---
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const status = document.getElementById('status');
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const openApp = document.getElementById('openApp');
-    const connectBtn = document.getElementById('connectBtn');
+    <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
+    <script>
+        // --- Elementos del DOM (HTML) ---
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const status = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const openApp = document.getElementById('openApp');
+        const connectBtn = document.getElementById('connectBtn');
 
-    let stream = null, scanning = false, scanInterval = null, scanLock = false;
-    
-    // --- Variables Serial (Lector y Escritor) ---
-    let serialPort;
-    let writer;
-    let reader;
+        let stream = null, scanning = false, scanInterval = null, scanLock = false;
 
-    // --- Funciones de la Cámara ---
-    async function startCamera() {
-         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-            video.srcObject = stream;
-            await video.play();
-            status.textContent = 'Cámara activa. Escaneando...';
-            scanning = true;
-            canvas.width = video.videoWidth || 320;
-            canvas.height = video.videoHeight || 240;
-            scanInterval = setInterval(scanFrame, 300);
-        } catch (e) { 
-            console.error(e); 
-            status.textContent = 'No se pudo acceder a la cámara.'; 
-            showToast('Haz clic en "Iniciar cámara" y permite el acceso');
-        }
-    }
+        // --- Variables Serial (Lector y Escritor) ---
+        let serialPort;
+        let writer;
+        let reader;
 
-    function stopCamera() {
-        scanning = false;
-        status.textContent = 'Cámara detenida.';
-        if (scanInterval) clearInterval(scanInterval);
-        if (stream) {
-            stream.getTracks().forEach(t => t.stop());
-            stream = null;
-        }
-        video.srcObject = null;
-    }
-
-    function scanFrame() {
-        if (!scanning || scanLock || video.readyState !== video.HAVE_ENOUGH_DATA) return;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
-        if (code) {
-            handleScanResult(code.data);
-        }
-    }
-
-    function extractSpaceId(text) {
-        const m = text.match(/Espacio\s*(\d+)/i);
-        if (m) return Number(m[1]);
-        const n = text.match(/\b(\d{1,3})\b/);
-        return n ? Number(n[1]) : null;
-    }
-
-    // 🔥 FUNCIÓN: Procesar comandos del estacionamiento
-    function processCommandObject(cmd) {
-        try {
-            if (!cmd) return;
-            
-            // COMANDO: Abrir ENTRADA cuando escanea QR
-            if (cmd.action === 'start' && Number.isInteger(cmd.spaceId)) {
-                if (serialPort && writer) {
-                    status.textContent = `QR Válido. Abriendo ENTRADA...`;
-                    enviarComandoSerial("abrir1"); // ENTRADA
-                    showToast('¡Portón ENTRADA abriendo!');
-
-                    setTimeout(() => {
-                        enviarComandoSerial("cerrar1"); // ENTRADA
-                        showToast('Portón ENTRADA cerrado.');
-                        status.textContent = 'Cámara activa. Escaneando...';
-                        scanLock = false;
-                    }, 5000);
-                }
-            }
-            
-            // 🔥 COMANDO: Abrir SALIDA cuando pagan en la web
-            else if (cmd.action === 'openExit' && Number.isInteger(cmd.spaceId)) {
-                if (serialPort && writer) {
-                    status.textContent = `Abriendo SALIDA para espacio ${cmd.spaceId}...`;
-                    enviarComandoSerial("abrir2"); // SALIDA
-                    showToast('¡Abriendo portón de SALIDA!');
-
-                    setTimeout(() => {
-                        enviarComandoSerial("cerrar2"); // SALIDA
-                        showToast('Portón de SALIDA cerrado.');
-                        status.textContent = 'Cámara activa. Escaneando...';
-                    }, 5000);
-                    
-                    // 🔥 LIMPIAR comando de Firebase después de procesarlo
-                    database.ref('commands/exit').remove();
-                }
-            }
-            
-        } catch (err) { 
-            console.error('processCommandObject error', err); 
-        }
-    }
-
-    // --- Lógica de Escaneo ---
-    function handleScanResult(data) {
-        if (scanLock) return;
-        scanLock = true;
-
-        const spaceId = extractSpaceId(data);
-        if (!spaceId) {
-            showToast('QR Inválido.');
-            setTimeout(() => { scanLock = false; }, 1200);
-            return;
-        }
-
-        // 🔥 NUEVO: Enviar comando al estacionamiento VIA FIREBASE
-        try {
-            const cmd = { action: 'start', spaceId: Number(spaceId), timestamp: Date.now() };
-            database.ref('commands/entrada').set(cmd).then(() => {
-                showToast(`Comando enviado: iniciar espacio ${spaceId}`);
-            }).catch(error => {
-                console.error('Error enviando a Firebase:', error);
-                showToast('Error enviando comando');
-            });
-        } catch (e) {
-            console.error('No se pudo escribir en Firebase', e);
-        }
-
-        // Si hay ESP32 conectado, abrir ENTRADA
-        if (serialPort && writer) {
-            processCommandObject({ action: 'start', spaceId: spaceId });
-        } else {
-            status.textContent = `QR detectado (espacio ${spaceId}). Esperando acción en la app.`;
-            scanLock = false;
-        }
-    }
-
-    // 🔥 ESCUCHAR COMANDOS DE FIREBASE (SALIDA)
-    function setupFirebaseListener() {
-        // Escuchar comandos de salida
-        database.ref('commands/exit').on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data && data.action === 'openExit') {
-                console.log('Comando de salida recibido:', data);
-                processCommandObject(data);
-            }
-        });
-        
-        // Escuchar comandos de entrada (backup)
-        database.ref('commands/entrada').on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data && data.action === 'start') {
-                console.log('Comando de entrada recibido:', data);
-                // También procesar entrada por si acaso
-                if (!scanLock && serialPort && writer) {
-                    processCommandObject(data);
-                }
-            }
-        });
-    }
-
-    // --- Bucle para escuchar al ESP32 ---
-    async function listenForSerialMessages() {
-        const textDecoder = new TextDecoderStream();
-        serialPort.readable.pipeTo(textDecoder.writable);
-        reader = textDecoder.readable.getReader();
-        
-        let lineBuffer = ''; 
-
-        while (true) {
+        // --- Funciones de la Cámara ---
+        async function startCamera() {
             try {
-                const { value, done } = await reader.read();
-                if (done) {
-                    reader.releaseLock();
-                    break;
-                }
-                lineBuffer += value;
-                let newlineIndex;
-                while ((newlineIndex = lineBuffer.indexOf('\n')) !== -1) {
-                    const line = lineBuffer.substring(0, newlineIndex).trim();
-                    lineBuffer = lineBuffer.substring(newlineIndex + 1);
-                    if (line) {
-                        handleSerialMessage(line);
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+                video.srcObject = stream;
+                await video.play();
+                status.textContent = 'Cámara activa. Escaneando...';
+                scanning = true;
+                canvas.width = video.videoWidth || 320;
+                canvas.height = video.videoHeight || 240;
+                scanInterval = setInterval(scanFrame, 300);
+            } catch (e) {
+                console.error(e);
+                status.textContent = 'No se pudo acceder a la cámara.';
+                showToast('Haz clic en "Iniciar cámara" y permite el acceso');
+            }
+        }
+
+        function stopCamera() {
+            scanning = false;
+            status.textContent = 'Cámara detenida.';
+            if (scanInterval) clearInterval(scanInterval);
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+                stream = null;
+            }
+            video.srcObject = null;
+        }
+
+        function scanFrame() {
+            if (!scanning || scanLock || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+            if (code) {
+                handleScanResult(code.data);
+            }
+        }
+
+        function extractSpaceId(text) {
+            const m = text.match(/Espacio\s*(\d+)/i);
+            if (m) return Number(m[1]);
+            const n = text.match(/\b(\d{1,3})\b/);
+            return n ? Number(n[1]) : null;
+        }
+
+        // 🔥 FUNCIÓN: Procesar comandos del estacionamiento
+        function processCommandObject(cmd) {
+            try {
+                if (!cmd) return;
+
+                // COMANDO: Abrir ENTRADA cuando escanea QR
+                if (cmd.action === 'start' && Number.isInteger(cmd.spaceId)) {
+                    if (serialPort && writer) {
+                        status.textContent = `QR Válido. Abriendo ENTRADA...`;
+                        enviarComandoSerial("abrir1"); // ENTRADA
+                        showToast('¡Portón ENTRADA abriendo!');
+
+                        setTimeout(() => {
+                            enviarComandoSerial("cerrar1"); // ENTRADA
+                            showToast('Portón ENTRADA cerrado.');
+                            status.textContent = 'Cámara activa. Escaneando...';
+                            scanLock = false;
+                        }, 5000);
                     }
                 }
-            } catch (error) {
-                console.error("Error leyendo el serial:", error);
-                break;
+
+                // 🔥 COMANDO: Abrir SALIDA cuando pagan en la web
+                else if (cmd.action === 'openExit' && Number.isInteger(cmd.spaceId)) {
+                    if (serialPort && writer) {
+                        status.textContent = `Abriendo SALIDA para espacio ${cmd.spaceId}...`;
+                        enviarComandoSerial("abrir2"); // SALIDA
+                        showToast('¡Abriendo portón de SALIDA!');
+
+                        setTimeout(() => {
+                            enviarComandoSerial("cerrar2"); // SALIDA
+                            showToast('Portón de SALIDA cerrado.');
+                            status.textContent = 'Cámara activa. Escaneando...';
+                        }, 5000);
+
+                        // 🔥 LIMPIAR comando de Firebase después de procesarlo
+                        database.ref('commands/exit').remove();
+                    }
+                }
+
+            } catch (err) {
+                console.error('processCommandObject error', err);
             }
         }
-    }
 
-    // --- Procesar respuestas del ESP32 ---
-    function handleSerialMessage(message) {
-        console.log("-> del ESP32:", message);
+        // --- Lógica de Escaneo ---
+        function handleScanResult(data) {
+            if (scanLock) return;
+            scanLock = true;
 
-        if (message.includes("PONG")) {
-            status.textContent = '¡ESP32 conectado y confirmado!';
-            showToast('¡Confirmación "PONG" recibida!');
-            connectBtn.style.background = '#28a745';
-            connectBtn.textContent = 'Conectado';
+            const spaceId = extractSpaceId(data);
+            if (!spaceId) {
+                showToast('QR Inválido.');
+                setTimeout(() => { scanLock = false; }, 1200);
+                return;
+            }
+
+            // 🔥 NUEVO: Enviar comando al estacionamiento VIA FIREBASE
+            try {
+                const cmd = { action: 'start', spaceId: Number(spaceId), timestamp: Date.now() };
+                database.ref('commands/entrada').set(cmd).then(() => {
+                    showToast(`Comando enviado: iniciar espacio ${spaceId}`);
+                }).catch(error => {
+                    console.error('Error enviando a Firebase:', error);
+                    showToast('Error enviando comando');
+                });
+            } catch (e) {
+                console.error('No se pudo escribir en Firebase', e);
+            }
+
+            // Si hay ESP32 conectado, abrir ENTRADA
+            if (serialPort && writer) {
+                processCommandObject({ action: 'start', spaceId: spaceId });
+            } else {
+                status.textContent = `QR detectado (espacio ${spaceId}). Esperando acción en la app.`;
+                scanLock = false;
+            }
         }
-        
-        if (message.includes("Abriendo porton de ENTRADA")) {
-            showToast("ESP32: Abriendo ENTRADA...");
+
+        // 🔥 ESCUCHAR COMANDOS DE FIREBASE (SALIDA)
+        function setupFirebaseListener() {
+            // Escuchar comandos de salida
+            database.ref('commands/exit').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.action === 'openExit') {
+                    console.log('Comando de salida recibido:', data);
+                    processCommandObject(data);
+                }
+            });
+
+            // Escuchar comandos de entrada (backup)
+            database.ref('commands/entrada').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.action === 'start') {
+                    console.log('Comando de entrada recibido:', data);
+                    // También procesar entrada por si acaso
+                    if (!scanLock && serialPort && writer) {
+                        processCommandObject(data);
+                    }
+                }
+            });
         }
-        if (message.includes("Cerrando porton de ENTRADA")) {
-            showToast("ESP32: Cerrando ENTRADA...");
+
+        // --- Bucle para escuchar al ESP32 ---
+        async function listenForSerialMessages() {
+            const textDecoder = new TextDecoderStream();
+            serialPort.readable.pipeTo(textDecoder.writable);
+            reader = textDecoder.readable.getReader();
+
+            let lineBuffer = '';
+
+            while (true) {
+                try {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        reader.releaseLock();
+                        break;
+                    }
+                    lineBuffer += value;
+                    let newlineIndex;
+                    while ((newlineIndex = lineBuffer.indexOf('\n')) !== -1) {
+                        const line = lineBuffer.substring(0, newlineIndex).trim();
+                        lineBuffer = lineBuffer.substring(newlineIndex + 1);
+                        if (line) {
+                            handleSerialMessage(line);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error leyendo el serial:", error);
+                    break;
+                }
+            }
         }
-        if (message.includes("Abriendo porton de SALIDA")) {
-            showToast("ESP32: Abriendo SALIDA...");
+
+        // --- Procesar respuestas del ESP32 ---
+        function handleSerialMessage(message) {
+            console.log("-> del ESP32:", message);
+
+            if (message.includes("PONG")) {
+                status.textContent = '¡ESP32 conectado y confirmado!';
+                showToast('¡Confirmación "PONG" recibida!');
+                connectBtn.style.background = '#28a745';
+                connectBtn.textContent = 'Conectado';
+            }
+
+            if (message.includes("Abriendo porton de ENTRADA")) {
+                showToast("ESP32: Abriendo ENTRADA...");
+            }
+            if (message.includes("Cerrando porton de ENTRADA")) {
+                showToast("ESP32: Cerrando ENTRADA...");
+            }
+            if (message.includes("Abriendo porton de SALIDA")) {
+                showToast("ESP32: Abriendo SALIDA...");
+            }
+            if (message.includes("Cerrando porton de SALIDA")) {
+                showToast("ESP32: Cerrando SALIDA...");
+            }
         }
-        if (message.includes("Cerrando porton de SALIDA")) {
-            showToast("ESP32: Cerrando SALIDA...");
+
+        // --- Función de Conexión ---
+        async function conectarConESP32() {
+            if (!('serial' in navigator)) {
+                alert('Usa Chrome o Edge. Tu navegador no soporta Web Serial.');
+                return;
+            }
+            try {
+                serialPort = await navigator.serial.requestPort();
+                await serialPort.open({ baudRate: 115200 });
+                listenForSerialMessages();
+                const textEncoder = new TextEncoderStream();
+                textEncoder.readable.pipeTo(serialPort.writable);
+                writer = textEncoder.writable.getWriter();
+
+                setTimeout(() => {
+                    enviarComandoSerial("ping");
+                    status.textContent = "Conectado. Verificando ESP32...";
+                    showToast("Enviando 'ping' de confirmación...");
+                }, 1000);
+
+            } catch (err) {
+                status.textContent = 'Error al conectar: ' + err.message;
+            }
         }
-    }
 
-    // --- Función de Conexión ---
-    async function conectarConESP32() {
-        if (!('serial' in navigator)) {
-            alert('Usa Chrome o Edge. Tu navegador no soporta Web Serial.');
-            return;
+        // --- Función de envío ---
+        async function enviarComandoSerial(comando) {
+            if (!writer) {
+                showToast("Error: El escritor no está listo.");
+                return;
+            }
+            await writer.write(comando + '\n');
+            console.log("-> al ESP32:", comando);
         }
-        try {
-            serialPort = await navigator.serial.requestPort();
-            await serialPort.open({ baudRate: 115200 }); 
-            listenForSerialMessages(); 
-            const textEncoder = new TextEncoderStream();
-            textEncoder.readable.pipeTo(serialPort.writable);
-            writer = textEncoder.writable.getWriter();
 
-            setTimeout(() => {
-                enviarComandoSerial("ping");
-                status.textContent = "Conectado. Verificando ESP32...";
-                showToast("Enviando 'ping' de confirmación...");
-            }, 1000); 
-
-        } catch (err) {
-            status.textContent = 'Error al conectar: ' + err.message;
+        // --- Notificaciones ---
+        function showToast(text, ms = 2500) {
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.textContent = text;
+            document.body.appendChild(t);
+            requestAnimationFrame(() => t.classList.add('show'));
+            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, ms);
         }
-    }
 
-    // --- Función de envío ---
-    async function enviarComandoSerial(comando) {
-        if (!writer) {
-            showToast("Error: El escritor no está listo.");
-            return;
-        }
-        await writer.write(comando + '\n');
-        console.log("-> al ESP32:", comando);
-    }
+        // --- ASIGNAR EVENTOS ---
+        startBtn.addEventListener('click', startCamera);
+        stopBtn.addEventListener('click', stopCamera);
+        openApp.addEventListener('click', () => window.open('Estacionamiento.html', '_blank'));
+        connectBtn.addEventListener('click', conectarConESP32);
 
-    // --- Notificaciones ---
-    function showToast(text, ms = 2500) {
-        const t = document.createElement('div');
-        t.className = 'toast';
-        t.textContent = text;
-        document.body.appendChild(t);
-        requestAnimationFrame(() => t.classList.add('show'));
-        setTimeout(() => { t.classList.remove('show'); setTimeout(()=>t.remove(), 300); }, ms);
-    }
+        // 🔥 INICIAR ESCUCHA DE FIREBASE
+        setupFirebaseListener();
 
-    // --- ASIGNAR EVENTOS ---
-    startBtn.addEventListener('click', startCamera);
-    stopBtn.addEventListener('click', stopCamera);
-    openApp.addEventListener('click', () => window.open('Estacionamiento.html', '_blank'));
-    connectBtn.addEventListener('click', conectarConESP32);
-
-    // 🔥 INICIAR ESCUCHA DE FIREBASE
-    setupFirebaseListener();
-
-    // NO auto-iniciar cámara - el usuario debe hacer clic
-    // startCamera(); // COMENTADO
-</script>
+        // NO auto-iniciar cámara - el usuario debe hacer clic
+        // startCamera(); // COMENTADO
+    </script>
 </body>
+
 </html>
